@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Puller Timeline</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #f0f0f0; padding: 20px; }
+  h1 { margin-bottom: 10px; }
+  #date { font-size: 24px; margin-right: 20px; }
+  #clock { font-size: 24px; margin-right: 20px; }
+  label { margin-left: 10px; }
+  input[type="number"] { width: 50px; margin-left: 5px; }
+  .timeline-wrapper { overflow-x: auto; }
+  .timeline-container { min-width: max-content; position: relative; }
+  .timeline { position: relative; display: flex; flex-wrap: nowrap; height: auto; border: 1px solid #ccc; background: #fff; margin-bottom: 0; }
+  .block { flex: 0 0 auto; height: 90px; border-right: 1px solid #ccc; cursor: pointer; background-color: #e0e0e0; display: flex; align-items: center; justify-content: center; font-size: 18px; position: relative; }
+  .block-tac { height: 70px; }
+  .block:last-child { border-right: none; }
+  .block.break { background-color: #000 !important; cursor: not-allowed; color: #fff; }
+  .block.clicked { background-color: #87ceeb !important; }
+  .block.clicked-tac { background-color: #fdfd96 !important; }
+  .time-indicator { position: absolute; top: 0; bottom: 0; width: 3px; background-color: red; z-index: 10; }
+  .label-row { display: flex; flex-wrap: nowrap; font-size: 14px; margin-top: 5px; margin-bottom: 30px; }
+  .label-row span { flex: 0 0 auto; text-align: center; }
+  button { margin-top: 20px; padding: 10px 15px; font-size: 14px; cursor: pointer; }
+  .count-tag { position: absolute; bottom: 2px; right: 2px; font-size: 12px; background: rgba(0, 0, 0, 0.6); color: #fff; padding: 2px 4px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<h1>1st Shift Puller Performance</h1>
+<div>
+  <span id="date"></span>
+  <span id="clock"></span>
+  <label for="taktTimeInput">Takt Time (min):</label>
+  <input type="number" id="taktTimeInput" value="6" min="1">
+</div>
+
+<h2>Puller 1
+  <select id="puller1Name">
+    <option value="">-- Select Puller 1 --</option>
+    <option>Alex G.</option><option>Becky L.</option><option>Benjamin M.</option><option>Chinny T.</option>
+    <option>Fabian D.</option><option>Joel T.</option><option>John G.</option><option>John R.</option><option>Michael C.</option><option>Tayden V.</option>
+    <option>Tyler B.</option><option>Tom P.</option>
+  </select>
+</h2>
+<div class="timeline-wrapper">
+  <div class="timeline-container">
+    <div class="timeline" id="timeline1"></div>
+    <div class="time-indicator"></div>
+    <div class="label-row" id="labels1"></div>
+  </div>
+</div>
+
+<h2>TAC</h2>
+<div class="timeline-wrapper">
+  <div class="timeline-container">
+    <div class="timeline" id="timelineTAC"></div>
+    <div class="time-indicator"></div>
+    <div class="label-row" id="labelsTAC"></div>
+  </div>
+</div>
+
+<h2>Puller 2
+  <select id="puller2Name">
+    <option value="">-- Select Puller 2 --</option>
+   <option>Alex G.</option><option>Becky L.</option><option>Benjamin M.</option><option>Chinny T.</option>
+    <option>Fabian D.</option><option>Joel T.</option><option>John G.</option><option>John R.</option><option>Michael C.</option><option>Tayden V.</option>
+    <option>Tyler B.</option><option>Tom P.</option>
+  </select>
+</h2>
+<div class="timeline-wrapper">
+  <div class="timeline-container">
+    <div class="timeline" id="timeline2"></div>
+    <div class="time-indicator"></div>
+    <div class="label-row" id="labels2"></div>
+  </div>
+</div>
+
+<button onclick="downloadLogs()">Download Click Logs</button>
+<button onclick="location.reload()">Refresh Page</button>
+
+<script>
+const startHour = 7;
+const startMinute = 10;
+const endHour = 15;
+const breakTimes = [
+  { start: "09:30", end: "09:50" },
+  { start: "12:00", end: "12:30" },
+];
+let intervalMinutes = 6;
+const blockBaseWidth = 90;
+const pullerCounts = { timeline1: 0, timeline2: 0, timelineTAC: 0 };
+
+function toMinutes(timeStr) {
+  const [h, m] = timeStr.split(":").map(Number);
+  return h * 60 + m;
+}
+function clearTimelines() {
+  ["timeline1", "timeline2", "timelineTAC"].forEach(id => document.getElementById(id).innerHTML = "");
+  ["labels1", "labels2", "labelsTAC"].forEach(id => document.getElementById(id).innerHTML = "");
+}
+function generateTimeline(timelineId, labelId, clickedClass = "clicked") {
+  const timeline = document.getElementById(timelineId);
+  const labelRow = document.getElementById(labelId);
+  let currentMinutes = startHour * 60 + startMinute;
+  const endMinutes = endHour * 60;
+  while (currentMinutes < endMinutes) {
+    const breakBlock = breakTimes.find(b => currentMinutes === toMinutes(b.start));
+    if (breakBlock) {
+      const block = document.createElement("div");
+      block.classList.add("block", "break");
+      if (timelineId === "timelineTAC") block.classList.add("block-tac");
+      const width = ((toMinutes(breakBlock.end) - toMinutes(breakBlock.start)) / 6) * blockBaseWidth;
+      block.style.width = `${width}px`;
+      block.textContent = "Break";
+      timeline.appendChild(block);
+
+      const label = document.createElement("span");
+      label.style.width = `${width}px`;
+      label.textContent = `${breakBlock.start} - ${breakBlock.end}`;
+      labelRow.appendChild(label);
+
+      currentMinutes = toMinutes(breakBlock.end);
+      continue;
+    }
+    const upcomingBreak = breakTimes.find(b => toMinutes(b.start) - currentMinutes <= intervalMinutes && toMinutes(b.start) - currentMinutes > 0);
+    const timeUntilBreak = upcomingBreak ? toMinutes(upcomingBreak.start) - currentMinutes : 0;
+    let blockInterval = (timeUntilBreak === 2 || timeUntilBreak === 4) ? timeUntilBreak : intervalMinutes;
+    const width = (blockInterval / 6) * blockBaseWidth;
+
+    const block = document.createElement("div");
+    block.classList.add("block");
+    if (timelineId === "timelineTAC") block.classList.add("block-tac");
+    block.style.width = `${width}px`;
+    block.onclick = () => {
+      const now = new Date();
+      block.classList.add(clickedClass);
+      block.innerHTML = "";
+      pullerCounts[timelineId]++;
+      const countTag = document.createElement("div");
+      countTag.className = "count-tag";
+      countTag.textContent = `x${pullerCounts[timelineId]}`;
+      block.appendChild(countTag);
+      const timeTag = document.createElement("div");
+      timeTag.textContent = now.toLocaleTimeString();
+      block.appendChild(timeTag);
+    };
+    timeline.appendChild(block);
+
+    const label = document.createElement("span");
+    label.style.width = `${width}px`;
+    const labelHour = Math.floor(currentMinutes / 60);
+    const labelMin = currentMinutes % 60;
+    const ampm = labelHour >= 12 ? "PM" : "AM";
+    const hour12 = labelHour % 12 === 0 ? 12 : labelHour % 12;
+    label.textContent = `${hour12}:${String(labelMin).padStart(2, "0")} ${ampm}`;
+    labelRow.appendChild(label);
+
+    currentMinutes += blockInterval;
+  }
+}
+function scrollToCurrentTimeIndicator() {
+  const wrappers = document.querySelectorAll(".timeline-wrapper");
+  wrappers.forEach((wrapper, index) => {
+    const container = wrapper.querySelector(".timeline-container");
+    const indicator = container.querySelector(".time-indicator");
+    if (indicator && indicator.style.left !== "-10px") {
+      const indicatorX = indicator.offsetLeft;
+      const wrapperWidth = wrapper.clientWidth;
+      const targetScrollLeft = indicatorX - (wrapperWidth / 2);
+      setTimeout(() => {
+        wrapper.scrollTo({ left: targetScrollLeft, behavior: "smooth" });
+      }, index * 100);
+    }
+  });
+}
+function updateIndicators() {
+  const timelines = document.querySelectorAll(".timeline-container");
+  const now = new Date();
+  const currentMinutesNow = now.getHours() * 60 + now.getMinutes();
+  const startMinutes = startHour * 60 + startMinute;
+  const totalMinutes = (endHour * 60) - startMinutes;
+  const elapsed = currentMinutesNow - startMinutes;
+  const percent = (elapsed / totalMinutes) * 100;
+
+  timelines.forEach(container => {
+    const indicator = container.querySelector(".time-indicator");
+    indicator.style.left = elapsed >= 0 && elapsed <= totalMinutes ? percent + "%" : "-10px";
+  });
+  scrollToCurrentTimeIndicator();
+}
+document.getElementById("taktTimeInput").addEventListener("change", () => {
+  intervalMinutes = parseInt(document.getElementById("taktTimeInput").value);
+  clearTimelines();
+  generateTimeline("timeline1", "labels1");
+  generateTimeline("timeline2", "labels2");
+  generateTimeline("timelineTAC", "labelsTAC", "clicked-tac");
+  updateIndicators();
+});
+function updateClock() {
+  const now = new Date();
+  document.getElementById("date").textContent = now.toLocaleDateString();
+  document.getElementById("clock").textContent = now.toLocaleTimeString();
+}
+setInterval(updateClock, 1000);
+setInterval(updateIndicators, 60000);
+updateClock();
+generateTimeline("timeline1", "labels1");
+generateTimeline("timeline2", "labels2");
+generateTimeline("timelineTAC", "labelsTAC", "clicked-tac");
+updateIndicators();
+function downloadLogs() {
+  const now = new Date();
+  const dateString = now.toISOString().split("T")[0];
+  let csv = "Section,Puller Name,Time Clicked\n";
+  const puller1Name = document.getElementById("puller1Name").value || "N/A";
+  const puller2Name = document.getElementById("puller2Name").value || "N/A";
+  [
+    { id: "timeline1", name: puller1Name },
+    { id: "timeline2", name: puller2Name },
+    { id: "timelineTAC", name: "TAC" },
+  ].forEach(({ id, name }) => {
+    const timeline = document.getElementById(id);
+    const blocks = timeline.querySelectorAll(".block");
+    blocks.forEach((block) => {
+      if (block.classList.contains("clicked") || block.classList.contains("clicked-tac")) {
+        const timeDiv = block.querySelector("div:last-child");
+        if (timeDiv) {
+          csv += `${id},${name},${timeDiv.textContent}\n`;
+        }
+      }
+    });
+  });
+  const blob = new Blob([csv], { type: "text/csv" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `click_logs_${dateString}.csv`;
+  link.click();
+}
+
+// Prevent accidental page refresh/reload
+window.addEventListener("beforeunload", function (e) {
+  e.preventDefault();
+  e.returnValue = "";
+});
+
+// Auto download logs at specific times
+const autoDownloadTimes = ["09:30", "12:00", "15:00"];
+function checkAutoDownload() {
+  const now = new Date();
+  const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  if (autoDownloadTimes.includes(currentTime)) {
+    downloadLogs();
+  }
+}
+setInterval(checkAutoDownload, 60000);
+</script>
+</body>
+</html>
